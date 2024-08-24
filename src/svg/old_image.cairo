@@ -1,4 +1,3 @@
-
 fn generate_svg_(token_id: u256) -> Array<felt252> {
     let mut svg = ArrayTrait::new();
     let mut num: u256 = token_id;

@@ -1,5 +1,12 @@
 use starknet::ContractAddress;
 
+#[derive(Drop, Serde, starknet::Store)]
+struct ArtistMetadata {
+    name: felt252,
+    bio: felt252,
+    profile_link: felt252,
+}
+
 #[starknet::interface]
 trait IERC721<TContractState> {
     // Views
@@ -21,4 +28,11 @@ trait IERC721<TContractState> {
     fn approve(ref self: TContractState, approved: ContractAddress, token_id: u256);
     fn set_approval_for_all(ref self: TContractState, operator: ContractAddress, approval: bool);
     fn mint(ref self: TContractState, to: ContractAddress);
+    fn create_series(
+        ref self: TContractState,
+        name: felt252,
+        description: felt252,
+        artist_info: ArtistMetadata,
+        base_uri: felt252,
+    ) -> u256;
 }

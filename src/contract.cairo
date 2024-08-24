@@ -13,6 +13,21 @@ mod SvgPoc {
     const IERC721_METADATA_ID: felt252 = 0x5b5e139f;
     const IERC721_RECEIVER_ID: felt252 = 0x150b7a02;
 
+
+    #[derive(Drop, Serde, starknet::Store)]
+    struct ArtistMetadata {
+        name: felt252,
+        bio: felt252,
+        profile_link: felt252,
+    }
+
+    #[derive(Drop, Serde, starknet::Store)]
+    struct Series {
+        name: felt252,
+        description: felt252,
+        base_uri: felt252,
+    }
+
     #[storage]
     struct Storage {
         _name: felt252,
@@ -23,6 +38,10 @@ mod SvgPoc {
         _operator_approvals: LegacyMap<(ContractAddress, ContractAddress), bool>,
         _token_uri: LegacyMap<u256, felt252>,
         _owner: ContractAddress,
+        _series_counter: u256,
+        _series_data: LegacyMap<u256, Series>,
+        _artists_counter: u256,
+        _artists_data: LegacyMap<u256, ArtistMetadata>,
     }
 
     // Events
@@ -124,6 +143,24 @@ mod SvgPoc {
 
             // Emit event
             self.emit(Event::Transfer(Transfer { from: Zeroable::zero(), to, token_id }));
+        }
+
+        fn create_series(
+            ref self: ContractState,
+            name: felt252,
+            description: felt252,
+            artist_info: ArtistMetadata,
+            base_uri: felt252,
+        ) -> u256 {
+            let series_id: u256 = self._series_counter.read() + 1;
+            let artists_id: u256 = self._artists_counter.read() + 1;
+            let new_series = Series { name, description, base_uri };
+            self._series_data.write(series_id, new_series);
+            self._series_counter.write(series_id);
+
+            self._artists_data.write(artists_id, artist_info);
+            self._artists_counter.write(artists_id);
+            series_id
         }
     }
 
