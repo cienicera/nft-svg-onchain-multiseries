@@ -42,9 +42,9 @@ fn get_animation_values(x: u8, y: u8, start: u8) -> (felt252, felt252) {
 use debug::PrintTrait;
 
 fn add_line(ref svg: Array<felt252>, x1: u8, y1: u8, x2: u8, y2: u8) {
-    let mut line = ArrayTrait::<felt252>::new();
+    let mut _line = ArrayTrait::<felt252>::new();
 
-    let neighbors: Span<u8> = array![0, 3, 6, 7, 8, 5, 2, 1].span();
+    let _neighbors: Span<u8> = array![0, 3, 6, 7, 8, 5, 2, 1].span();
 
     let dx = (x2 + 1) - x1;
     let dy = (y2 + 1) - y1;

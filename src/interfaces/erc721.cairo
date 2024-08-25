@@ -1,11 +1,6 @@
 use starknet::ContractAddress;
-
-#[derive(Drop, Serde, starknet::Store)]
-struct ArtistMetadata {
-    name: felt252,
-    bio: felt252,
-    profile_link: felt252,
-}
+use nicera_svg_poc::base::types::ArtistMetadata;
+use nicera_svg_poc::base::types::Series;
 
 #[starknet::interface]
 trait IERC721<TContractState> {
@@ -28,6 +23,8 @@ trait IERC721<TContractState> {
     fn approve(ref self: TContractState, approved: ContractAddress, token_id: u256);
     fn set_approval_for_all(ref self: TContractState, operator: ContractAddress, approval: bool);
     fn mint(ref self: TContractState, to: ContractAddress);
+    fn get_series(self: @TContractState, series_id: u256) -> Series;
+    fn get_artist(self: @TContractState, artist_id: u256) -> ArtistMetadata;
     fn create_series(
         ref self: TContractState,
         name: felt252,

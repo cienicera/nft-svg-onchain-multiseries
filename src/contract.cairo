@@ -1,7 +1,9 @@
 #[starknet::contract]
 mod SvgPoc {
-    //use nft_svg_onchain_poc::interfaces::erc721::IERC721;
+    use nicera_svg_poc::interfaces::erc721::IERC721;
     use nicera_svg_poc::svg::image::generate_svg;
+    use nicera_svg_poc::base::types::ArtistMetadata;
+    use nicera_svg_poc::base::types::Series;
     use starknet::ContractAddress;
     use starknet::get_caller_address;
     use zeroable::Zeroable;
@@ -12,21 +14,6 @@ mod SvgPoc {
     const IERC721_ID: felt252 = 0x80ac58cd;
     const IERC721_METADATA_ID: felt252 = 0x5b5e139f;
     const IERC721_RECEIVER_ID: felt252 = 0x150b7a02;
-
-
-    #[derive(Drop, Serde, starknet::Store)]
-    struct ArtistMetadata {
-        name: felt252,
-        bio: felt252,
-        profile_link: felt252,
-    }
-
-    #[derive(Drop, Serde, starknet::Store)]
-    struct Series {
-        name: felt252,
-        description: felt252,
-        base_uri: felt252,
-    }
 
     #[storage]
     struct Storage {
@@ -81,9 +68,9 @@ mod SvgPoc {
         self._owner.write(get_caller_address());
     }
 
-    #[generate_trait]
-    #[external(v0)]
-    impl SvgPocImpl of IERC721 {
+
+    #[abi(embed_v0)]
+    impl SvgPocImpl of IERC721<ContractState> {
         fn name(self: @ContractState) -> felt252 {
             'nicera_svg_poc'
         }
@@ -143,6 +130,14 @@ mod SvgPoc {
 
             // Emit event
             self.emit(Event::Transfer(Transfer { from: Zeroable::zero(), to, token_id }));
+        }
+
+        fn get_series(self: @ContractState, series_id: u256) -> Series {
+            self._series_data.read(series_id)
+        }
+
+        fn get_artist(self: @ContractState, artist_id: u256) -> ArtistMetadata {
+            self._artists_data.read(artist_id)
         }
 
         fn create_series(
