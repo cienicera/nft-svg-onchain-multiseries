@@ -2,6 +2,7 @@
 pub struct ArtistMetadata {
     name: felt252,
     bio: felt252,
+    // wallet_address: ContractAddress,
     profile_link: felt252,
 }
 
