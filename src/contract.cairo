@@ -1,34 +1,82 @@
-#[starknet::contract]
-mod SvgPoc {
-    use nicera_svg_poc::interfaces::erc721::IERC721;
-    use nicera_svg_poc::svg::image::generate_svg;
-    use nicera_svg_poc::base::types::ArtistMetadata;
-    use nicera_svg_poc::base::types::Series;
-    use starknet::ContractAddress;
-    use starknet::get_caller_address;
-    use zeroable::Zeroable;
-    use option::OptionTrait;
-    use array::ArrayTrait;
-    use traits::Into;
+use starknet::ContractAddress;
 
-    const IERC721_ID: felt252 = 0x80ac58cd;
-    const IERC721_METADATA_ID: felt252 = 0x5b5e139f;
-    const IERC721_RECEIVER_ID: felt252 = 0x150b7a02;
+// *************************************************************************
+//                             OZ IMPORTS
+// *************************************************************************
+use openzeppelin::{
+    token::erc721::{ERC721Component::{ERC721Metadata, HasComponent}},
+    introspection::src5::SRC5Component,
+};
+
+#[starknet::interface]
+trait IERC721Metadata<TState> {
+    fn name(self: @TState) -> ByteArray;
+    fn symbol(self: @TState) -> ByteArray;
+}
+
+#[starknet::embeddable]
+impl IERC721MetadataImpl<
+    TContractState,
+    +HasComponent<TContractState>,
+    +SRC5Component::HasComponent<TContractState>,
+    +Drop<TContractState>
+> of IERC721Metadata<TContractState> {
+    fn name(self: @TContractState) -> ByteArray {
+        let component = HasComponent::get_component(self);
+        ERC721Metadata::name(component)
+    }
+
+    fn symbol(self: @TContractState) -> ByteArray {
+        let component = HasComponent::get_component(self);
+        ERC721Metadata::symbol(component)
+    }
+}
+
+#[starknet::contract]
+pub mod SeriesPoc {
+    use openzeppelin::token::erc721::interface::IERC721Metadata;
+    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
+
+    use core::traits::TryInto;
+    // use core::num::traits::zero::Zero;
+
+    use nicera_svg_poc::interfaces::erc721::IERC721;
+    use nicera_svg_poc::base::types::Series;
+    use nicera_svg_poc::base::types::ArtistMetadata;
+
+    use openzeppelin::{
+        token::erc721::{
+            ERC721Component, erc721::ERC721Component::InternalTrait as ERC721InternalTrait
+        },
+        introspection::{src5::SRC5Component}
+    };
+    component!(path: SRC5Component, storage: src5, event: SRC5Event);
+    component!(path: ERC721Component, storage: erc721, event: ERC721Event);
+
+
+    // allow to check what interface is supported
+    #[abi(embed_v0)]
+    impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
+    impl SRC5InternalImpl = SRC5Component::InternalImpl<ContractState>;
+
+    #[abi(embed_v0)]
+    impl ERC721Impl = ERC721Component::ERC721Impl<ContractState>;
+    #[abi(embed_v0)]
+    impl ERC721CamelOnly = ERC721Component::ERC721CamelOnlyImpl<ContractState>;
+    #[abi(embed_v0)]
+    impl ERC721MetadataCamelOnly =
+        ERC721Component::ERC721MetadataCamelOnlyImpl<ContractState>;
 
     #[storage]
     struct Storage {
-        _name: felt252,
-        _symbol: felt252,
-        _owners: LegacyMap<u256, ContractAddress>,
-        _balances: LegacyMap<ContractAddress, u256>,
-        _token_approvals: LegacyMap<u256, ContractAddress>,
-        _operator_approvals: LegacyMap<(ContractAddress, ContractAddress), bool>,
-        _token_uri: LegacyMap<u256, felt252>,
-        _owner: ContractAddress,
         _series_counter: u256,
         _series_data: LegacyMap<u256, Series>,
         _artists_counter: u256,
         _artists_data: LegacyMap<u256, ArtistMetadata>,
+        #[substorage(v0)]
+        erc721: ERC721Component::Storage,
+        #[substorage(v0)]
+        src5: SRC5Component::Storage,
     }
 
     // Events
@@ -38,6 +86,10 @@ mod SvgPoc {
         Transfer: Transfer,
         Approval: Approval,
         ApprovalForAll: ApprovalForAll,
+        #[flat]
+        ERC721Event: ERC721Component::Event,
+        #[flat]
+        SRC5Event: SRC5Component::Event,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -61,85 +113,70 @@ mod SvgPoc {
         approved: bool,
     }
 
+
     #[constructor]
-    fn constructor(ref self: ContractState, name_: felt252, symbol_: felt252) {
-        self._name.write(name_);
-        self._symbol.write(symbol_);
-        self._owner.write(get_caller_address());
+    fn constructor(ref self: ContractState, name: ByteArray, symbol: ByteArray,) {
+        let base_uri = "";
+        self.erc721.initializer(name, symbol, base_uri);
     }
 
-
     #[abi(embed_v0)]
-    impl SvgPocImpl of IERC721<ContractState> {
-        fn name(self: @ContractState) -> felt252 {
-            'nicera_svg_poc'
+    impl SeriesImpl of IERC721<ContractState> {
+        fn name(self: @ContractState) -> ByteArray {
+            self.erc721.name()
         }
 
-        fn symbol(self: @ContractState) -> felt252 {
-            'NSP'
+        /// @notice returns the collection symbol
+        fn symbol(self: @ContractState) -> ByteArray {
+            self.erc721.symbol()
         }
 
-        fn owner(self: @ContractState) -> ContractAddress {
-            self._owner.read()
+        fn token_uri(self: @ContractState, token_id: u256) -> ByteArray {
+            self.erc721.token_uri(token_id)
         }
-
-        fn token_uri(self: @ContractState, token_id: u256) -> Array<felt252> {
-            generate_svg(token_id)
-        }
-
         fn balance_of(self: @ContractState, owner: ContractAddress) -> u256 {
-            1
+            self.erc721.balance_of(owner)
         }
-
         fn owner_of(self: @ContractState, token_id: u256) -> ContractAddress {
-            self._owner.read()
+            self.erc721.owner_of(token_id)
         }
-
         fn get_approved(self: @ContractState, token_id: u256) -> ContractAddress {
-            self._owner.read()
+            self.erc721.get_approved(token_id)
         }
-
         fn is_approved_for_all(
             self: @ContractState, owner: ContractAddress, operator: ContractAddress
         ) -> bool {
-            false
+            self.erc721.is_approved_for_all(owner, operator)
+        }
+        fn transfer_from(
+            ref self: ContractState, from: ContractAddress, to: ContractAddress, token_id: u256
+        ) {
+            self.erc721.transfer_from(from, to, token_id)
         }
 
-        fn transfer_from(
-            self: @ContractState, from: ContractAddress, to: ContractAddress, token_id: u256
-        ) {}
 
-        // Externals
-        fn approve(ref self: ContractState, approved: ContractAddress, token_id: u256) {}
+        fn approve(ref self: ContractState, approved: ContractAddress, token_id: u256) {
+            self.erc721.approve(approved, token_id)
+        }
         fn set_approval_for_all(
             ref self: ContractState, operator: ContractAddress, approval: bool
-        ) {}
-
+        ) {
+            self.erc721.set_approval_for_all(operator, approval)
+        }
         fn mint(ref self: ContractState, to: ContractAddress) {
             assert(!to.is_zero(), 'ERC721: invalid receiver');
-            let token_id: felt252 = get_caller_address().into();
-            let token_id: u256 = token_id.into();
-            assert(!self._exists(token_id), 'ERC721: token already minted');
+            let mut token_id = self.erc721.balanceOf(to) + 1.into();
+            self.erc721._mint(to, token_id);
 
-            // Update balances
-            self._balances.write(to, self._balances.read(to) + 1.into());
-
-            // Update token_id owner
-
-            self._owners.write(token_id, to);
-
-            // Emit event
+            // Emit Event
             self.emit(Event::Transfer(Transfer { from: Zeroable::zero(), to, token_id }));
         }
-
         fn get_series(self: @ContractState, series_id: u256) -> Series {
             self._series_data.read(series_id)
         }
-
         fn get_artist(self: @ContractState, artist_id: u256) -> ArtistMetadata {
             self._artists_data.read(artist_id)
         }
-
         fn create_series(
             ref self: ContractState,
             name: felt252,
@@ -156,14 +193,6 @@ mod SvgPoc {
             self._artists_data.write(artists_id, artist_info);
             self._artists_counter.write(artists_id);
             series_id
-        }
-    }
-
-    /// Helpers (internal functions)
-    #[generate_trait]
-    impl HelperImpl of HelperTrait {
-        fn _exists(self: @ContractState, token_id: u256) -> bool {
-            !self._owners.read(token_id).is_zero()
         }
     }
 }

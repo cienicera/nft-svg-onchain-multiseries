@@ -5,10 +5,10 @@ use nicera_svg_poc::base::types::Series;
 #[starknet::interface]
 trait IERC721<TContractState> {
     // Views
-    fn name(self: @TContractState) -> felt252;
-    fn symbol(self: @TContractState) -> felt252;
-    fn owner(self: @TContractState) -> ContractAddress;
-    fn token_uri(self: @TContractState, token_id: u256) -> Array<felt252>;
+    fn name(self: @TContractState) -> ByteArray;
+    fn symbol(self: @TContractState) -> ByteArray;
+    // fn owner(self: @TContractState) -> ContractAddress;
+    fn token_uri(self: @TContractState, token_id: u256) -> ByteArray;
     fn balance_of(self: @TContractState, owner: ContractAddress) -> u256;
     fn owner_of(self: @TContractState, token_id: u256) -> ContractAddress;
     fn get_approved(self: @TContractState, token_id: u256) -> ContractAddress;
@@ -16,7 +16,7 @@ trait IERC721<TContractState> {
         self: @TContractState, owner: ContractAddress, operator: ContractAddress
     ) -> bool;
     fn transfer_from(
-        self: @TContractState, from: ContractAddress, to: ContractAddress, token_id: u256
+        ref self: TContractState, from: ContractAddress, to: ContractAddress, token_id: u256
     );
 
     // Externals
